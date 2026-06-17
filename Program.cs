@@ -20,7 +20,7 @@ string pastMemory =  File.ReadAllText("memory.txt");
 
 AIAgent timeAgent = ollamaClient.AsAIAgent(
     instructions: $"You analyze time and space complexity of the code snippet. Nothing else... Past analyses:\n{pastMemory}",
-    tools: [AIFunctionFactory.Create(Tools.RunCode)]
+    tools: [AIFunctionFactory.Create(Tools.RunCode), AIFunctionFactory.Create(Tools.GetWeather)]
 );
 
 AIAgent edgeAgent = ollamaClient.AsAIAgent(
