@@ -38,6 +38,15 @@ while (true)
     string? userResponse = Console.ReadLine();
     if(userResponse == null) break;
 
+// checking if we already did this 
+    if(pastMemory.Contains(userResponse)) {
+        
+        Console.WriteLine("Already analyzed this one. Nice tokens.");
+        continue;
+
+    };
+
+
     Console.WriteLine(await timeAgent.RunAsync(userResponse));
     Console.WriteLine(await edgeAgent.RunAsync(userResponse));
     File.AppendAllText("memory.txt", $"- Analyzed: {userResponse}\n");
