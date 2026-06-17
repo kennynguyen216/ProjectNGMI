@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.AI;
-using OllamaSharp;
 using Microsoft.Agents.AI;
+using OllamaSharp;
+
 
 var httpClient = new HttpClient
 {
@@ -9,48 +10,30 @@ var httpClient = new HttpClient
 };
 
 IChatClient ollamaClient = new OllamaApiClient(httpClient, "qwen3:8b");
-//warns me im using ollama and its lowk foreign but im saying dont worry
-#pragma warning disable SKEXP0070
-var builder = Kernel.CreateBuilder();
-builder.Services.AddSingleton<IChatCompletionService>(ollamaClient.AsChatCompletionService());
-var kernel = builder.Build();
-#pragma warning restore SKEXP0070
+
+// define agents here
+
+AIAgent timeAgent = ollamaClient.AsAIAgent(
+    instructions: "You analyze time and space complexity of the code snippet. Nothing else",
+    tools: [AIFunctionFactory.Create(Tools.RunCode)]
+);
+
+AIAgent edgeAgent = ollamaClient.AsAIAgent(
+    instructions: "You analyze edge cases and where the code snippet may fail or glitch. Nothing else",
+    tools: [AIFunctionFactory.Create(Tools.RunCode)]
+);
 
 
-var bigOAgent = new ChatCompletionAgent
+// conversation loop here
+
+while (true)
 {
-    Name = "BigOOptimizer",
-    Instructions = "Only analyze space and time complexity. Nothing else",
-    Kernel = kernel
-};
-
-var edgeAgent = new ChatCompletionAgent
-{
-    Name = "EdgeCaseDestroyer",
-    Instructions = "Only analyze edge cases of code snippet. Nothing else",
-    Kernel = kernel
-};
-
-var bigOThread = new ChatHistoryAgentThread();
-
-var edgeThread = new ChatHistoryAgentThread();
-
-
-while(true)
-{
-    
-    Console.Write("Enter solution");
+    Console.WriteLine("Enter Solution");
     string? userResponse = Console.ReadLine();
     if(userResponse == null) break;
 
-    await foreach (var message in bigOAgent.InvokeAsync(userResponse,bigOThread))
-    {
-        Console.WriteLine(message.Message.Content);
-    }
+    Console.WriteLine(await timeAgent.RunAsync(userResponse));
+    Console.WriteLine(await edgeAgent.RunAsync(userResponse));
 
-    await foreach (var edgeMessage in edgeAgent.InvokeAsync(userResponse, edgeThread))
-    {
-        Console.WriteLine(edgeMessage.Message.Content);
-    }
 
 }
