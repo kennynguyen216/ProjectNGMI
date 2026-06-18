@@ -1,17 +1,35 @@
 using System.ComponentModel;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
+
 class Tools
 {
-    public static string RunCode(string code)
+    public static async Task<string> RunCode(string code)
     {
-        Console.WriteLine("[TOOL CALLED] RunCode invoked");
-        return $"Stub: executed code snippet. No runtime errors detected.";
+        
+
+        try
+        {
+            string codeWrapper = $"class Submission {{{code}}}";
+            await CSharpScript.RunAsync(codeWrapper);
+            return "Code executed. Good job";
+        }
+        catch (CompilationErrorException ex)
+        {
+            return $"Compilation error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            return $"Runtime exception {ex.Message}";
+        }
     }
 
     [Description("Get the weather for the given location")]
     public static string GetWeather([Description("The location to get the weather for.")] string location)
     {
         Console.WriteLine($"The weather in {location} is pretty nice");
-        return $"Stub: executed code snippet. No runtime errors detected.";
+        return $"The weather in {location} is sunny and 72°F.";
+
     }
 
 

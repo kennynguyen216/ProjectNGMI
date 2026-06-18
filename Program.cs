@@ -38,6 +38,8 @@ while (true)
     string? userResponse = Console.ReadLine();
     if(userResponse == null) break;
 
+   
+
 // checking if we already did this 
     if(pastMemory.Contains(userResponse)) {
         
@@ -46,9 +48,12 @@ while (true)
 
     };
 
+    //this runs the code hard coded
+    string executionResult = await Tools.RunCode(userResponse);
+    string fullPrompt = $"{userResponse}\n\nExecution result: {executionResult}";
 
-    Console.WriteLine(await timeAgent.RunAsync(userResponse));
-    Console.WriteLine(await edgeAgent.RunAsync(userResponse));
+    Console.WriteLine(await timeAgent.RunAsync(fullPrompt));
+    Console.WriteLine(await edgeAgent.RunAsync(fullPrompt));
     File.AppendAllText("memory.txt", $"- Analyzed: {userResponse}\n");
 
 }
