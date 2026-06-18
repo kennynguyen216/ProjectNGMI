@@ -10,8 +10,10 @@ class Tools
 
         try
         {
+            var scriptOptions = ScriptOptions.Default
+                .WithImports("System", "System.Collections.Generic", "System.Linq");
             string codeWrapper = $"class Submission {{{code}}}";
-            await CSharpScript.RunAsync(codeWrapper);
+            await CSharpScript.RunAsync(codeWrapper, scriptOptions);
             return "Code executed. Good job";
         }
         catch (CompilationErrorException ex)
