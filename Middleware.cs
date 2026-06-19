@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 
 class Middleware
 {
+// Fires on every non-streaming agent run, logs the unput and output 
     public static async Task<AgentResponse> CustomAgentRunMiddleware(
         IEnumerable<ChatMessage> messages,
         AgentSession? session,
@@ -15,11 +16,12 @@ class Middleware
     {
         Console.WriteLine($"[RUN MIDDLEWARE] Agent Starting. Input: {string.Join(" ", messages.Select(message => message.Text))}");
         var result = await innerAgent.RunAsync(messages, session, options, cancellationToken);
-        Console.WriteLine($"[Run MIDDLEWARE] Agent Done. Out: {result.Text}");
+        Console.WriteLine("[Run MIDDLEWARE] Agent Done.");
         return result;
         
     }
 
+// guardrail function to see if the code snippet is actually code
     public static async Task<AgentResponse> GuardrailMiddleware(
         IEnumerable<ChatMessage> messages,
         AgentSession? session,
@@ -35,6 +37,7 @@ class Middleware
     }
     return await innerAgent.RunAsync(messages, session, options, cancellationToken);
     }
+//yields chunks as they arrive 
     public static async IAsyncEnumerable<AgentResponseUpdate> CustomAgentRunStreamingMiddleware (
         IEnumerable<ChatMessage> messages,
         AgentSession? session, 
@@ -50,7 +53,7 @@ class Middleware
         }
         Console.WriteLine("[RUN Middleware] Streaming done.");
     }
-
+// logs how many messages are being sent to the model 
     public static async Task<ChatResponse> CustomChatClientMiddleware(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options,
@@ -64,6 +67,7 @@ class Middleware
         return result;
     
     }
+//Fires whenever the function calls a tool 
     public static async ValueTask<object?> LoggingMiddleware(
         AIAgent agent,
         FunctionInvocationContext context,

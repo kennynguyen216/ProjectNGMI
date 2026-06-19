@@ -20,7 +20,8 @@ IChatClient ollamaClient = baseClient
 
 // memory time
 
-string pastMemory =  File.ReadAllText("memory.txt");
+Database.Initialize();
+string pastMemory = Database.GetPastAnalyses();
 
 
 // define agents here
@@ -56,7 +57,7 @@ while (true)
    
 
 // checking if we already did this 
-    if(pastMemory.Contains(userResponse)) {
+    if(Database.IsAlreadyAnalyzed(userResponse)) {
         
         Console.WriteLine("Already analyzed this one. Nice tokens.");
         continue;
@@ -67,13 +68,17 @@ while (true)
     string fullPrompt = $"{userResponse}\n\nExecution result: {executionResult}";
     AgentSession session = await timeAgent.CreateSessionAsync();
 
+    var analysisResult = new System.Text.StringBuilder();
     await foreach(var update in timeAgent.RunStreamingAsync(fullPrompt, session))
     {
         Console.Write(update);
+        analysisResult.Append(update.Text);
     }
+
+
     Console.WriteLine();
     Console.WriteLine((await edgeAgent.RunAsync(fullPrompt)).Text);
-    File.AppendAllText("memory.txt", $"- Analyzed: {userResponse}\n");
+    Database.SaveAnalysis(userResponse, analysisResult.ToString());
 
     while (true)
     {
