@@ -24,7 +24,7 @@ AIAgent timeAgent = ollamaClient.AsAIAgent(
     tools: [AIFunctionFactory.Create(Tools.RunCode), AIFunctionFactory.Create(Tools.GetWeather)]
 ).AsBuilder()
     .Use(Middleware.LoggingMiddleware)
-    .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: null)
+    .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
     .Build();
 
 AIAgent edgeAgent = ollamaClient.AsAIAgent(
@@ -32,7 +32,7 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
     tools: [AIFunctionFactory.Create(Tools.RunCode)]
 ).AsBuilder()
     .Use(Middleware.LoggingMiddleware)
-    .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: null)
+    .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
     .Build();
 
 

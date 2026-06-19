@@ -11,7 +11,8 @@ class Tools
         try
         {
             var scriptOptions = ScriptOptions.Default
-                .WithImports("System", "System.Collections.Generic", "System.Linq");
+                .WithImports("System", "System.Collections.Generic", "System.Linq")
+                .WithReferences(typeof(System.Linq.Enumerable).Assembly);
             string codeWrapper = $"class Submission {{{code}}}";
             await CSharpScript.RunAsync(codeWrapper, scriptOptions);
             return "Code executed. Good job";

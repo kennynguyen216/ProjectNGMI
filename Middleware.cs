@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Agents.AI;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 
 class Middleware
@@ -18,6 +19,22 @@ class Middleware
         return result;
         
     }
+
+    public static async IAsyncEnumerable<AgentResponseUpdate> CustomAgentRunStreamingMiddleware (
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session, 
+        AgentRunOptions? options,
+        AIAgent innerAgent,
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
+    {
+        Console.WriteLine("[RUN Middleware] Streaming started.");
+        await foreach(var update in innerAgent.RunStreamingAsync(messages, session, options, cancellationToken))
+        {
+            yield return update;
+        }
+        Console.WriteLine("[RUN Middleware] Streaming done.");
+    }
     public static async ValueTask<object?> LoggingMiddleware(
         AIAgent agent,
         FunctionInvocationContext context,
@@ -30,6 +47,8 @@ class Middleware
         return result;
 
     }
+
+
 
 
 
