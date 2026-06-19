@@ -10,7 +10,13 @@ var httpClient = new HttpClient
 };
 
 const string ModelName = "qwen3:8b";
-IChatClient ollamaClient = new OllamaApiClient(httpClient, ModelName);
+
+IChatClient baseClient = new OllamaApiClient(httpClient, ModelName);
+
+IChatClient ollamaClient = baseClient
+    .AsBuilder()
+    .Use(getResponseFunc: Middleware.CustomChatClientMiddleware, getStreamingResponseFunc: null)
+    .Build();
 
 // memory time
 

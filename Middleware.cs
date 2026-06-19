@@ -35,6 +35,20 @@ class Middleware
         }
         Console.WriteLine("[RUN Middleware] Streaming done.");
     }
+
+    public static async Task<ChatResponse> CustomChatClientMiddleware(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options,
+        IChatClient innerChatClient, 
+        CancellationToken cancellationToken
+    )
+    {
+        Console.WriteLine($"[Chat Middleware] :{messages.Count()} messages to Ollama. ");
+        var result = await innerChatClient.GetResponseAsync(messages, options, cancellationToken);
+        Console.WriteLine("[Chat Middleware] Response Received.");
+        return result;
+    
+    }
     public static async ValueTask<object?> LoggingMiddleware(
         AIAgent agent,
         FunctionInvocationContext context,
