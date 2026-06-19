@@ -63,13 +63,26 @@ while (true)
 
     string executionResult = await Tools.RunCode(userResponse);
     string fullPrompt = $"{userResponse}\n\nExecution result: {executionResult}";
+    AgentSession session = await timeAgent.CreateSessionAsync();
 
-    await foreach(var update in timeAgent.RunStreamingAsync(fullPrompt))
+    await foreach(var update in timeAgent.RunStreamingAsync(fullPrompt, session))
     {
         Console.Write(update);
     }
     Console.WriteLine();
     Console.WriteLine(await edgeAgent.RunAsync(fullPrompt));
     File.AppendAllText("memory.txt", $"- Analyzed: {userResponse}\n");
+
+    while (true)
+    {
+        Console.WriteLine("Follow up or type 'done':");
+        string? followUp = Console.ReadLine();
+        if (followUp == null || followUp == "done") break;
+        await foreach (var update in timeAgent.RunStreamingAsync(followUp, session))
+        {
+            Console.Write(update);
+        }
+        Console.WriteLine();
+    }
 
 }
