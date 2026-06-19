@@ -29,6 +29,7 @@ AIAgent timeAgent = ollamaClient.AsAIAgent(
     instructions: $"You analyze time and space complexity of the code snippet. If the user gives code, call RunCode before answering. If the user asks about weather, call GetWeather before answering. Do not answer from memory when a tool is available. Past analyses:\n{pastMemory}",
     tools: [AIFunctionFactory.Create(Tools.RunCode), AIFunctionFactory.Create(Tools.GetWeather)]
 ).AsBuilder()
+    .Use(runFunc: Middleware.GuardrailMiddleware, runStreamingFunc: null)
     .Use(Middleware.LoggingMiddleware)
     .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
     .Build();
@@ -37,6 +38,7 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
     instructions: $"You analyze edge cases and where the code snippet may fail or glitch. If the user gives code, call RunCode before answering. Do not answer from memory when a tool is available. Past analyses:\n{pastMemory}",
     tools: [AIFunctionFactory.Create(Tools.RunCode)]
 ).AsBuilder()
+    .Use(runFunc: Middleware.GuardrailMiddleware, runStreamingFunc: null)
     .Use(Middleware.LoggingMiddleware)
     .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
     .Build();
@@ -70,7 +72,7 @@ while (true)
         Console.Write(update);
     }
     Console.WriteLine();
-    Console.WriteLine(await edgeAgent.RunAsync(fullPrompt));
+    Console.WriteLine((await edgeAgent.RunAsync(fullPrompt)).Text);
     File.AppendAllText("memory.txt", $"- Analyzed: {userResponse}\n");
 
     while (true)

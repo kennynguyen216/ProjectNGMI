@@ -20,6 +20,21 @@ class Middleware
         
     }
 
+    public static async Task<AgentResponse> GuardrailMiddleware(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session,
+        AgentRunOptions? options, 
+        AIAgent innerAgent, 
+        CancellationToken cancellationToken)
+    {
+      string input = string.Join(" ", messages.Select(m => m.Text));
+    if (!input.Contains('{') || !input.Contains('}'))
+    {
+        Console.WriteLine("[GUARDRAIL] Blocked: input is not a code snippet.");
+        return new AgentResponse([new ChatMessage(ChatRole.Assistant, "Please submit a C# code snippet.")]);
+    }
+    return await innerAgent.RunAsync(messages, session, options, cancellationToken);
+    }
     public static async IAsyncEnumerable<AgentResponseUpdate> CustomAgentRunStreamingMiddleware (
         IEnumerable<ChatMessage> messages,
         AgentSession? session, 
