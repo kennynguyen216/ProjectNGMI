@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.AI;
 using Microsoft.Agents.AI;
 using OllamaSharp;
-
+using Microsoft.Agents.AI.Workflows;
 
 var httpClient = new HttpClient
 {
@@ -48,6 +48,11 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
     .Build();
 
 
+// define workflow executors
+var runCode = new RunCodeExecutor();
+var timeExec = new TimeAgentExecutor(timeAgent);
+var edgeExec = new EdgeAgentExecutor(edgeAgent);
+
 // conversation loop here
 
 while (true)
@@ -67,21 +72,20 @@ while (true)
 
     };
 
-    string executionResult = await Tools.RunCode(userResponse);
-    string fullPrompt = $"{userResponse}\n\nExecution result: {executionResult}";
+    var workflowBuilder = new WorkflowBuilder(runCode);
+    workflowBuilder.AddEdge(runCode, timeExec).AddEdge(timeExec, edgeExec).WithOutputFrom(edgeExec);
+    var workflow = workflowBuilder.Build();
+
     AgentSession session = await timeAgent.CreateSessionAsync();
 
-    var analysisResult = new System.Text.StringBuilder();
-    await foreach(var update in timeAgent.RunStreamingAsync(fullPrompt, session))
+    await using var run = await InProcessExecution.RunAsync(workflow, userResponse);
+    foreach (var evt in run.NewEvents)
     {
-        Console.Write(update);
-        analysisResult.Append(update.Text);
+        if(evt is ExecutorCompletedEvent completed)
+            Console.WriteLine($"[{completed.ExecutorId}]: {completed.Data}");
     }
+    Database.SaveAnalysis(userResponse, "workflow analysis");
 
-
-    Console.WriteLine();
-    Console.WriteLine((await edgeAgent.RunAsync(fullPrompt)).Text);
-    Database.SaveAnalysis(userResponse, analysisResult.ToString());
 
     while (true)
     {

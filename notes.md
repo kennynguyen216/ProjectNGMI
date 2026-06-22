@@ -15,8 +15,13 @@
 11. SQLite database replacing memory.txt — stores code + analysis + timestamp
 12. Duplicate detection via database query instead of string match
 
+13. Result override middleware — appends NGMI footer to all agent responses
+14. Exception handling middleware on edgeAgent — catches timeouts gracefully
+15. Workflows — RunCodeExecutor → TimeAgentExecutor → EdgeAgentExecutor pipeline using WorkflowBuilder and InProcessExecution
+
 ## Up Next
 
+- Test and verify workflow runs end-to-end
 - Embeddings for semantic deduplication (cosine similarity over code vectors)
 - ASP.NET Core API conversion
-- More middleware pages: Result Overrides, Exception Handling, Shared State
+- Remaining middleware: Shared State, Runtime Context, Agent vs Run Scope
