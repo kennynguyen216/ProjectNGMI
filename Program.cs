@@ -3,6 +3,8 @@ using Microsoft.Agents.AI;
 using OllamaSharp;
 using Microsoft.Agents.AI.Workflows;
 
+var builder = WebApplication.CreateBuilder(args);
+
 var httpClient = new HttpClient
 {
     BaseAddress = new Uri("http://localhost:11434"),
@@ -18,13 +20,8 @@ IChatClient ollamaClient = baseClient
     .Use(getResponseFunc: Middleware.CustomChatClientMiddleware, getStreamingResponseFunc: null)
     .Build();
 
-// memory time
-
 Database.Initialize();
 string pastMemory = Database.GetPastAnalyses();
-
-
-// define agents here
 
 AIAgent timeAgent = ollamaClient.AsAIAgent(
     instructions: $"You analyze time and space complexity of the code snippet. If the user gives code, call RunCode before answering. If the user asks about weather, call GetWeather before answering. Do not answer from memory when a tool is available. Past analyses:\n{pastMemory}",
@@ -47,56 +44,36 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
     .Use(runFunc: Middleware.ResultOverrideMiddleware, runStreamingFunc: null)
     .Build();
 
-
-// define workflow executors
 var runCode = new RunCodeExecutor();
 var timeExec = new TimeAgentExecutor(timeAgent);
 var edgeExec = new EdgeAgentExecutor(edgeAgent);
 
-// conversation loop here
+var app = builder.Build();
 
-while (true)
+app.MapPost("/analyze", async (AnalyzeRequest request) =>
 {
-    Console.WriteLine("Enter Solution");
-  
-    string? userResponse = Console.ReadLine();
-    if(userResponse == null) break;
+    string userCode = request.Code;
 
-   
-
-// checking if we already did this 
-    if(Database.IsAlreadyAnalyzed(userResponse)) {
-        
-        Console.WriteLine("Already analyzed this one. Nice tokens.");
-        continue;
-
-    };
+    if (Database.IsAlreadyAnalyzed(userCode))
+        return Results.Ok("Already analyzed this one. Nice tokens.");
 
     var workflowBuilder = new WorkflowBuilder(runCode);
     workflowBuilder.AddEdge(runCode, timeExec).AddEdge(timeExec, edgeExec).WithOutputFrom(edgeExec);
     var workflow = workflowBuilder.Build();
 
-    AgentSession session = await timeAgent.CreateSessionAsync();
-
-    await using var run = await InProcessExecution.RunAsync(workflow, userResponse);
+    await using var run = await InProcessExecution.RunAsync(workflow, userCode);
+    string result = "";
     foreach (var evt in run.NewEvents)
     {
-        if(evt is ExecutorCompletedEvent completed)
-            Console.WriteLine($"[{completed.ExecutorId}]: {completed.Data}");
-    }
-    Database.SaveAnalysis(userResponse, "workflow analysis");
-
-
-    while (true)
-    {
-        Console.WriteLine("Follow up or type 'done':");
-        string? followUp = Console.ReadLine();
-        if (followUp == null || followUp == "done") break;
-        await foreach (var update in timeAgent.RunStreamingAsync(followUp, session))
-        {
-            Console.Write(update);
-        }
-        Console.WriteLine();
+        if (evt is ExecutorCompletedEvent completed)
+            result = completed.Data?.ToString() ?? "";
     }
 
-}
+    Database.SaveAnalysis(userCode, result);
+    return Results.Ok(result);
+});
+
+app.Run();
+
+record AnalyzeRequest(string Code);
+
