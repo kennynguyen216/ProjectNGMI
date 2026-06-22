@@ -40,6 +40,7 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
     instructions: $"You analyze edge cases and where the code snippet may fail or glitch. If the user gives code, call RunCode before answering. Do not answer from memory when a tool is available. Past analyses:\n{pastMemory}",
     tools: [AIFunctionFactory.Create(Tools.RunCode)]
 ).AsBuilder()
+    .Use(runFunc: Middleware.ExceptionHandlingMiddleware, runStreamingFunc: null)
     .Use(runFunc: Middleware.GuardrailMiddleware, runStreamingFunc: null)
     .Use(Middleware.LoggingMiddleware)
     .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)

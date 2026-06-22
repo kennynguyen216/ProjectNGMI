@@ -39,6 +39,25 @@ class Middleware
         
     }
 
+    public static async Task<AgentResponse> ExceptionHandlingMiddleware(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session, 
+        AgentRunOptions? options, 
+        AIAgent innerAgent,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+    {
+            return await innerAgent.RunAsync(messages, session, options, cancellationToken);
+    }
+        catch (Exception ex)
+    {
+            Console.WriteLine($"[EXCEPTION] Agent failed: {ex.Message}");
+            return new AgentResponse([new ChatMessage(ChatRole.Assistant, "Edge case analysis timed out. Submit a new snippet when ready.")]);
+    }  
+    }
+
 // guardrail function to see if the code snippet is actually code
     public static async Task<AgentResponse> GuardrailMiddleware(
         IEnumerable<ChatMessage> messages,
