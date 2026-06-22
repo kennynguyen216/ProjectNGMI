@@ -60,6 +60,7 @@ app.MapPost("/analyze", async (AnalyzeRequest request) =>
     var workflowBuilder = new WorkflowBuilder(runCode);
     workflowBuilder.AddEdge(runCode, timeExec).AddEdge(timeExec, edgeExec).WithOutputFrom(edgeExec);
     var workflow = workflowBuilder.Build();
+    Console.WriteLine(workflow.ToMermaidString());
 
     await using var run = await InProcessExecution.RunAsync(workflow, userCode);
     string result = "";
