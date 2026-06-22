@@ -33,6 +33,7 @@ AIAgent timeAgent = ollamaClient.AsAIAgent(
     .Use(runFunc: Middleware.GuardrailMiddleware, runStreamingFunc: null)
     .Use(Middleware.LoggingMiddleware)
     .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
+    .Use(runFunc: Middleware.ResultOverrideMiddleware, runStreamingFunc: null)
     .Build();
 
 AIAgent edgeAgent = ollamaClient.AsAIAgent(
@@ -42,6 +43,7 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
     .Use(runFunc: Middleware.GuardrailMiddleware, runStreamingFunc: null)
     .Use(Middleware.LoggingMiddleware)
     .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
+    .Use(runFunc: Middleware.ResultOverrideMiddleware, runStreamingFunc: null)
     .Build();
 
 

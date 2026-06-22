@@ -21,6 +21,24 @@ class Middleware
         
     }
 
+    public static async Task<AgentResponse> ResultOverrideMiddleware(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session,
+        AgentRunOptions? options, 
+        AIAgent innerAgent,
+        CancellationToken cancellationToken)
+    {
+        var response = await innerAgent.RunAsync(messages, session, options, cancellationToken);
+        var modifiedMessages = response.Messages.Select(msg =>
+        msg.Role == ChatRole.Assistant && msg.Text is not null
+        ? new ChatMessage(ChatRole.Assistant, msg.Text + "\n\n--- Analysis by NGMI ---")
+        : msg
+        ).ToList();
+        return new AgentResponse(modifiedMessages);
+
+        
+    }
+
 // guardrail function to see if the code snippet is actually code
     public static async Task<AgentResponse> GuardrailMiddleware(
         IEnumerable<ChatMessage> messages,
