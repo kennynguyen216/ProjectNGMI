@@ -62,6 +62,10 @@ Workflow CreateWorkflow()
         .Build();
 }
 
+CheckpointManager checkpointManager = CheckpointManager.CreateInMemory();
+
+
+
 app.MapPost("/analyze", async (AnalyzeRequest request) =>
 {
     string userCode = request.Code;
@@ -73,13 +77,14 @@ app.MapPost("/analyze", async (AnalyzeRequest request) =>
 
     Console.WriteLine(workflow.ToMermaidString());
 
-    await using var run = await InProcessExecution.RunAsync(workflow, userCode);
+    await using var run = await InProcessExecution.RunStreamingAsync(workflow, userCode,checkpointManager);
     string result = "";
-    foreach (var evt in run.NewEvents)
+    await foreach (var evt in run.WatchStreamAsync())
     {
         if (evt is WorkflowOutputEvent output)
             result = output.Data?.ToString() ?? "";
     }
+Console.WriteLine($"[CHECKPOINTS] {run.Checkpoints.Count} checkpoints created.");
 
     Database.SaveAnalysis(userCode, result);
     return Results.Ok(result);
