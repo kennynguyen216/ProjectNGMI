@@ -47,6 +47,7 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
 var runCode = new RunCodeExecutor();
 var timeExec = new TimeAgentExecutor(timeAgent);
 var edgeExec = new EdgeAgentExecutor(edgeAgent);
+var compilationErrorExec = new CompilationErrorExecutor();
 
 var app = builder.Build();
 
@@ -57,17 +58,27 @@ app.MapPost("/analyze", async (AnalyzeRequest request) =>
     if (Database.IsAlreadyAnalyzed(userCode))
         return Results.Ok("Already analyzed this one. Nice tokens.");
 
-    var workflowBuilder = new WorkflowBuilder(runCode);
-    workflowBuilder.AddEdge(runCode, timeExec).AddEdge(timeExec, edgeExec).WithOutputFrom(edgeExec);
-    var workflow = workflowBuilder.Build();
+    var workflow = new WorkflowBuilder(runCode)
+        .AddEdge<CompilationResult>(
+            runCode,
+            timeExec,
+            condition: result => result is { Success: true })
+        .AddEdge(timeExec, edgeExec)
+        .AddEdge<CompilationResult>(
+            runCode,
+            compilationErrorExec,
+            condition: result => result is { Success: false })
+        .WithOutputFrom(edgeExec, compilationErrorExec)
+        .Build();
+
     Console.WriteLine(workflow.ToMermaidString());
 
     await using var run = await InProcessExecution.RunAsync(workflow, userCode);
     string result = "";
     foreach (var evt in run.NewEvents)
     {
-        if (evt is ExecutorCompletedEvent completed)
-            result = completed.Data?.ToString() ?? "";
+        if (evt is WorkflowOutputEvent output)
+            result = output.Data?.ToString() ?? "";
     }
 
     Database.SaveAnalysis(userCode, result);
@@ -77,4 +88,3 @@ app.MapPost("/analyze", async (AnalyzeRequest request) =>
 app.Run();
 
 record AnalyzeRequest(string Code);
-
