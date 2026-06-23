@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.77.0" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.77.0-alpha" />
     <PackageReference Include="OllamaSharp" Version="5.4.25" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
   </ItemGroup>
 
 </Project>
