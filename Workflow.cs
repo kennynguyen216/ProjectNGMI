@@ -11,6 +11,7 @@ class RunCodeExecutor() : Executor<string, CompilationResult>("RunCodeExecutor")
         CancellationToken cancellationToken = default)
     {
         string executionResult = await Tools.RunCode(code);
+        await context.QueueStateUpdateAsync("originalCode", code, scopeName: "SharedCode", cancellationToken);
         bool success = executionResult.Contains("Code executed. Good job");
 
         return new CompilationResult(code, success, executionResult);
@@ -48,6 +49,8 @@ class EdgeAgentExecutor(AIAgent agent) : Executor<string, string>("EdgeAgentExec
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
+        var originalCode = await context.ReadStateAsync<string>("originalCode", scopeName: "SharedCode", cancellationToken);
+        Console.WriteLine($"[SHARED STATE] Original code: {originalCode}");
         var response = await agent.RunAsync(fullPrompt, cancellationToken: cancellationToken);
         return response.Text ?? "";
     }
