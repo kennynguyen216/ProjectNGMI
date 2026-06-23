@@ -2,6 +2,7 @@
 using Microsoft.Agents.AI;
 using OllamaSharp;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,12 +45,22 @@ AIAgent edgeAgent = ollamaClient.AsAIAgent(
     .Use(runFunc: Middleware.ResultOverrideMiddleware, runStreamingFunc: null)
     .Build();
 
-var runCode = new RunCodeExecutor();
-var timeExec = new TimeAgentExecutor(timeAgent);
-var edgeExec = new EdgeAgentExecutor(edgeAgent);
-var compilationErrorExec = new CompilationErrorExecutor();
-
 var app = builder.Build();
+
+Workflow CreateWorkflow()
+{
+    var runCode = new RunCodeExecutor();
+    var timeExec = new TimeAgentExecutor(timeAgent);
+    var edgeExec = new EdgeAgentExecutor(edgeAgent);
+    var compilationErrorExec = new CompilationErrorExecutor();
+
+    return new WorkflowBuilder(runCode)
+        .AddEdge<CompilationResult>(runCode, timeExec, condition: result => result is { Success: true })
+        .AddEdge(timeExec, edgeExec)
+        .AddEdge<CompilationResult>(runCode, compilationErrorExec, condition: result => result is { Success: false })
+        .WithOutputFrom(edgeExec, compilationErrorExec)
+        .Build();
+}
 
 app.MapPost("/analyze", async (AnalyzeRequest request) =>
 {
@@ -58,18 +69,7 @@ app.MapPost("/analyze", async (AnalyzeRequest request) =>
     if (Database.IsAlreadyAnalyzed(userCode))
         return Results.Ok("Already analyzed this one. Nice tokens.");
 
-    var workflow = new WorkflowBuilder(runCode)
-        .AddEdge<CompilationResult>(
-            runCode,
-            timeExec,
-            condition: result => result is { Success: true })
-        .AddEdge(timeExec, edgeExec)
-        .AddEdge<CompilationResult>(
-            runCode,
-            compilationErrorExec,
-            condition: result => result is { Success: false })
-        .WithOutputFrom(edgeExec, compilationErrorExec)
-        .Build();
+    var workflow = CreateWorkflow();
 
     Console.WriteLine(workflow.ToMermaidString());
 
