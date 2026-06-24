@@ -1,4 +1,6 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.Data.Sqlite;
+using SQLitePCL;
 
 
 class Database
@@ -40,6 +42,26 @@ class Database
         command.ExecuteNonQuery();
     }
 
+    public static string SearchByKeywords(string[] keywords)
+    {
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        var command = connection.CreateCommand();
+        var conditions = keywords.Select(k =>$"Code LIKE '%{k}%'");
+        string whereClause = string.Join(" OR ", conditions);
+        command.CommandText = $"SELECT code FROM Analysis WHERE {whereClause}";
+        var results = new List<string>();
+        using var reader = command.ExecuteReader();
+
+        while(reader.Read())
+        {
+            results.Add(reader.GetString(0));
+        }
+        return string.Join("\n", results);
+
+
+
+    }
     public static string GetPastAnalyses()
     {
         using var connection = new SqliteConnection(ConnectionString);

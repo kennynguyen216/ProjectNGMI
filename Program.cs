@@ -3,41 +3,59 @@ using Microsoft.Agents.AI;
 using OllamaSharp;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using OpenAI;
+using System.ClientModel;
 
 var builder = WebApplication.CreateBuilder(args);
+var config = builder.Configuration;
 
-var httpClient = new HttpClient
+var options = new OpenAIClientOptions()
 {
-    BaseAddress = new Uri("http://localhost:11434"),
-    Timeout = TimeSpan.FromMinutes(10)
+    Endpoint = new Uri(builder.Configuration["Endpoint"])
 };
 
-const string ModelName = "qwen3:8b";
+string ModelName = builder.Configuration["ModelName"];
 
-IChatClient baseClient = new OllamaApiClient(httpClient, ModelName);
+var chatClient = new OpenAIClient(new ApiKeyCredential("tiger123"), options)
+.GetChatClient(ModelName)
+.AsIChatClient()
+.AsBuilder()
+.Use(getResponseFunc: Middleware.CustomChatClientMiddleware, getStreamingResponseFunc: null)
+.Build();
 
-IChatClient ollamaClient = baseClient
-    .AsBuilder()
-    .Use(getResponseFunc: Middleware.CustomChatClientMiddleware, getStreamingResponseFunc: null)
-    .Build();
 
 Database.Initialize();
-string pastMemory = Database.GetPastAnalyses();
 
-AIAgent timeAgent = ollamaClient.AsAIAgent(
-    instructions: $"You analyze time and space complexity of the code snippet. If the user gives code, call RunCode before answering. If the user asks about weather, call GetWeather before answering. Do not answer from memory when a tool is available. Past analyses:\n{pastMemory}",
-    tools: [AIFunctionFactory.Create(Tools.RunCode), AIFunctionFactory.Create(Tools.GetWeather)]
-).AsBuilder()
+static Task<IEnumerable<TextSearchProvider.TextSearchResult>> SearchPastAnalyses(string query, CancellationToken cancellationToken)
+{
+    var keywords = query.Split([' ', '(', ')', '{', '}', ';'], StringSplitOptions.RemoveEmptyEntries);
+    var results = Database.SearchByKeywords(keywords);
+    return Task.FromResult(results.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        .Select(r => new TextSearchProvider.TextSearchResult { Text = r }));
+}
+
+
+var ragOptions = new TextSearchProviderOptions
+{
+    SearchTime = TextSearchProviderOptions.TextSearchBehavior.BeforeAIInvoke
+};
+
+AIAgent timeAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
+{
+    ChatOptions = new() { Instructions = "You analyze time and space complexity of code snippets. The code and its execution result are already provided in the prompt. Do not call any tools. Just analyze and respond." },
+    AIContextProviders = [new TextSearchProvider(SearchPastAnalyses, ragOptions)]
+}).AsBuilder()
     .Use(runFunc: Middleware.GuardrailMiddleware, runStreamingFunc: null)
     .Use(Middleware.LoggingMiddleware)
     .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
     .Use(runFunc: Middleware.ResultOverrideMiddleware, runStreamingFunc: null)
     .Build();
 
-AIAgent edgeAgent = ollamaClient.AsAIAgent(
-    instructions: $"You analyze edge cases and where the code snippet may fail or glitch. If the user gives code, call RunCode before answering. Do not answer from memory when a tool is available. Past analyses:\n{pastMemory}",
-    tools: [AIFunctionFactory.Create(Tools.RunCode)]
-).AsBuilder()
+AIAgent edgeAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
+{
+    ChatOptions = new() { Instructions = "You analyze edge cases where the code may fail or glitch. The code and its execution result are already provided in the prompt. Do not call any tools. Just analyze and respond." },
+    AIContextProviders = [new TextSearchProvider(SearchPastAnalyses, ragOptions)]
+}).AsBuilder()
     .Use(runFunc: Middleware.ExceptionHandlingMiddleware, runStreamingFunc: null)
     .Use(runFunc: Middleware.GuardrailMiddleware, runStreamingFunc: null)
     .Use(Middleware.LoggingMiddleware)
@@ -70,8 +88,8 @@ app.MapPost("/analyze", async (AnalyzeRequest request) =>
 {
     string userCode = request.Code;
 
-    if (Database.IsAlreadyAnalyzed(userCode))
-        return Results.Ok("Already analyzed this one. Nice tokens.");
+    // if (Database.IsAlreadyAnalyzed(userCode))
+    //     return Results.Ok("Already analyzed this one. Nice tokens.");
 
     var workflow = CreateWorkflow();
 

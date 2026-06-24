@@ -22,6 +22,10 @@
 ## Up Next
 
 - Test and verify workflow runs end-to-end
+
+user input → RunCodeExecutor → TimeAgentExecutor → EdgeAgentExecutor → output
+
+
 - Embeddings for semantic deduplication (cosine similarity over code vectors)
 - ASP.NET Core API conversion
 - Remaining middleware: Shared State, Runtime Context, Agent vs Run Scope
