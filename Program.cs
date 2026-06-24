@@ -65,22 +65,26 @@ AIAgent edgeAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
 
 var app = builder.Build();
 
-Workflow CreateWorkflow()
+Workflow CreateWorkflow(TaskCompletionSource<bool> approval, TaskCompletionSource<string> paused)
 {
     var runCode = new RunCodeExecutor();
     var timeExec = new TimeAgentExecutor(timeAgent);
+    var humanExec = new HumanReviewExecutor(approval, paused);
     var edgeExec = new EdgeAgentExecutor(edgeAgent);
     var compilationErrorExec = new CompilationErrorExecutor();
 
     return new WorkflowBuilder(runCode)
         .AddEdge<CompilationResult>(runCode, timeExec, condition: result => result is { Success: true })
-        .AddEdge(timeExec, edgeExec)
+        .AddEdge(timeExec, humanExec)
+        .AddEdge(humanExec, edgeExec)
         .AddEdge<CompilationResult>(runCode, compilationErrorExec, condition: result => result is { Success: false })
         .WithOutputFrom(edgeExec, compilationErrorExec)
         .Build();
 }
 
 CheckpointManager checkpointManager = CheckpointManager.CreateInMemory();
+var sessions = new Dictionary<string, (TaskCompletionSource<bool> Approval, Task<string> Completion, string Code)>();
+
 
 
 
@@ -91,23 +95,50 @@ app.MapPost("/analyze", async (AnalyzeRequest request) =>
     // if (Database.IsAlreadyAnalyzed(userCode))
     //     return Results.Ok("Already analyzed this one. Nice tokens.");
 
-    var workflow = CreateWorkflow();
+    var approval = new TaskCompletionSource<bool>();
+    var paused = new TaskCompletionSource<string>();
+    var workflow = CreateWorkflow(approval, paused);
+
 
     Console.WriteLine(workflow.ToMermaidString());
 
-    await using var run = await InProcessExecution.RunStreamingAsync(workflow, userCode,checkpointManager);
-    string result = "";
-    await foreach (var evt in run.WatchStreamAsync())
-    {
-        if (evt is WorkflowOutputEvent output)
-            result = output.Data?.ToString() ?? "";
-    }
-Console.WriteLine($"[CHECKPOINTS] {run.Checkpoints.Count} checkpoints created.");
+    var run = await InProcessExecution.RunStreamingAsync(workflow, userCode, checkpointManager);
 
-    Database.SaveAnalysis(userCode, result);
-    return Results.Ok(result);
+    var completionTask = Task.Run(async () =>
+    {
+        string result = "";
+        await foreach (var evt in run.WatchStreamAsync())
+        {
+            if (evt is WorkflowOutputEvent output)
+                result = output.Data?.ToString() ?? "";
+        }
+        return result;
+    });
+
+    string partialResult = await paused.Task;
+    string sessionId = Guid.NewGuid().ToString();
+    sessions[sessionId] = (approval, completionTask, userCode);
+
+    return Results.Ok(new { sessionId, partialResult });
+});
+
+app.MapPost("/resume", async (ResumeRequest request) =>
+{
+    if (!sessions.TryGetValue(request.SessionId, out var session))
+        return Results.NotFound("Session not found.");
+
+    sessions.Remove(request.SessionId);
+    session.Approval.SetResult(request.Approved);
+
+    if (!request.Approved)
+        return Results.Ok("Analysis cancelled.");
+
+    string finalResult = await session.Completion;
+    Database.SaveAnalysis(session.Code, finalResult);
+    return Results.Ok(finalResult);
 });
 
 app.Run();
 
 record AnalyzeRequest(string Code);
+record ResumeRequest(string SessionId, bool Approved);

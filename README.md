@@ -8,31 +8,32 @@ NGMI is a multi-agent code evaluation system that takes a C# code snippet, compi
 
 Submissions are processed through a sequential workflow pipeline:
 
-```
+```mermaid
 flowchart TD
   RunCodeExecutor["RunCodeExecutor (Start)"];
   TimeAgentExecutor["TimeAgentExecutor"];
   EdgeAgentExecutor["EdgeAgentExecutor"];
-  Error["This does not run ❌"];
+  CompilationErrorExecutor["CompilationErrorExecutor ❌"];
   Response["HTTP 200 Response ✅"];
-  RunCodeExecutor -->|Code compiled| TimeAgentExecutor;
-  RunCodeExecutor -->|Compilation error| Error;
-  TimeAgentExecutor -->|Success| EdgeAgentExecutor;
-  TimeAgentExecutor -->|Compile error propagated| Error;
+  RunCodeExecutor -. conditional: Success=true .-> TimeAgentExecutor;
+  RunCodeExecutor -. conditional: Success=false .-> CompilationErrorExecutor;
+  TimeAgentExecutor --> EdgeAgentExecutor;
   EdgeAgentExecutor --> Response;
+  CompilationErrorExecutor --> Response;
 ```
 
-- **RunCodeExecutor** — compiles and runs the snippet using Roslyn. Fails fast if it doesn't compile.
-- **TimeAgentExecutor** — sends the code to an LLM agent for time/space complexity analysis.
-- **EdgeAgentExecutor** — sends the code + complexity analysis to a second LLM agent to identify edge cases.
+- **RunCodeExecutor** — compiles and runs the snippet using Roslyn. Returns a `CompilationResult` with `Success: true/false`.
+- **TimeAgentExecutor** — receives code + execution result, analyzes time/space complexity using RAG context from past analyses.
+- **EdgeAgentExecutor** — receives code + complexity analysis, identifies edge cases using RAG context.
+- **CompilationErrorExecutor** — fast-fail path for broken code, skips both agents entirely.
 
 ## Stack
 
 - .NET 10 / C#
 - Microsoft Agent Framework (MAF)
-- Ollama (qwen3:8b running locally)
+- OpenAI-compatible local model (via appsettings.json)
 - Roslyn C# Scripting
-- SQLite (analysis history + duplicate detection)
+- SQLite (analysis history + keyword search for RAG)
 - ASP.NET Core Minimal API
 
 ## Running It
@@ -60,5 +61,10 @@ Duplicate submissions are detected and skipped automatically.
 - Sessions and multi-turn conversations
 - SQLite persistence
 - Workflows with WorkflowBuilder and InProcessExecution
-- Conditional branching in workflow executors
+- Conditional edges with typed CompilationResult routing
+- CompilationErrorExecutor fast-fail path
+- Workflow shared state (QueueStateUpdateAsync / ReadStateAsync)
+- Workflow state isolation via CreateWorkflow helper
+- Checkpoints with CheckpointManager
+- RAG with TextSearchProvider and keyword-based SQLite search
 - ASP.NET Core hosting

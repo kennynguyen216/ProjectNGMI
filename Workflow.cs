@@ -1,3 +1,4 @@
+using Google.Protobuf.WellKnownTypes;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 
@@ -54,4 +55,21 @@ class EdgeAgentExecutor(AIAgent agent) : Executor<string, string>("EdgeAgentExec
         var response = await agent.RunAsync(fullPrompt, cancellationToken: cancellationToken);
         return response.Text ?? "";
     }
+}
+
+class HumanReviewExecutor(TaskCompletionSource<bool> approval, TaskCompletionSource<string> paused) : Executor<string, string>("HumanReviewExecutor")
+{
+    public override async ValueTask<string> HandleAsync(
+        string input, 
+        IWorkflowContext context,
+        CancellationToken cancellationToken = default
+    )
+    {
+        paused.SetResult(input);
+        bool approved = await approval.Task;
+        if(!approved) throw new OperationCanceledException("Rejected.");
+        return input;
+    }
+
+
 }
