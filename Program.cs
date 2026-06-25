@@ -53,7 +53,7 @@ AIAgent timeAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
 
 AIAgent edgeAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
 {
-    ChatOptions = new() { Instructions = "You analyze edge cases where the code may fail or glitch. The code and its execution result are already provided in the prompt. Do not call any tools. Just analyze and respond." },
+    ChatOptions = new() { Instructions = "You analyze edge cases where the code may fail or glitch. The code and its execution result are already provided in the prompt. Do not call any tools. Just analyze and respond. If you find any edge cases or issues, end your response with ISSUES_FOUND. If the code handles all edge cases correctly, end with NO_ISSUES." },
     AIContextProviders = [new TextSearchProvider(SearchPastAnalyses, ragOptions)]
 }).AsBuilder()
     .Use(runFunc: Middleware.ExceptionHandlingMiddleware, runStreamingFunc: null)
@@ -61,6 +61,14 @@ AIAgent edgeAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
     .Use(Middleware.LoggingMiddleware)
     .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
     .Use(runFunc: Middleware.ResultOverrideMiddleware, runStreamingFunc: null)
+    .Build();
+
+AIAgent hintAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
+{
+    ChatOptions = new() { Instructions = "You give hints to help the user fix edge cases in their code without giving away the full solution. Be concise and Socratic." },
+}).AsBuilder()
+    .Use(Middleware.LoggingMiddleware)
+    .Use(runFunc: Middleware.CustomAgentRunMiddleware, runStreamingFunc: Middleware.CustomAgentRunStreamingMiddleware)
     .Build();
 
 var app = builder.Build();
@@ -71,6 +79,7 @@ Workflow CreateWorkflow(TaskCompletionSource<bool> approval, TaskCompletionSourc
     var timeExec = new TimeAgentExecutor(timeAgent);
     var humanExec = new HumanReviewExecutor(approval, paused);
     var edgeExec = new EdgeAgentExecutor(edgeAgent);
+    var hintExec = new HintAgentExecutor(hintAgent);
     var compilationErrorExec = new CompilationErrorExecutor();
 
     return new WorkflowBuilder(runCode)
@@ -78,7 +87,8 @@ Workflow CreateWorkflow(TaskCompletionSource<bool> approval, TaskCompletionSourc
         .AddEdge(timeExec, humanExec)
         .AddEdge(humanExec, edgeExec)
         .AddEdge<CompilationResult>(runCode, compilationErrorExec, condition: result => result is { Success: false })
-        .WithOutputFrom(edgeExec, compilationErrorExec)
+        .AddEdge<EdgeResult>(edgeExec, hintExec, condition: result => result.HasIssues)
+        .WithOutputFrom(hintExec, edgeExec, compilationErrorExec)
         .Build();
 }
 

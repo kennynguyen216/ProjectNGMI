@@ -1,8 +1,8 @@
-using Google.Protobuf.WellKnownTypes;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 
 record CompilationResult(string Code, bool Success, string Output);
+record EdgeResult(string Analysis, bool HasIssues);
 
 class RunCodeExecutor() : Executor<string, CompilationResult>("RunCodeExecutor")
 {
@@ -43,9 +43,9 @@ class TimeAgentExecutor(AIAgent agent) : Executor<CompilationResult, string>("Ti
     }
 }
 
-class EdgeAgentExecutor(AIAgent agent) : Executor<string, string>("EdgeAgentExecutor")
+class EdgeAgentExecutor(AIAgent agent) : Executor<string, EdgeResult>("EdgeAgentExecutor")
 {
-    public override async ValueTask<string> HandleAsync(
+    public override async ValueTask<EdgeResult> HandleAsync(
         string fullPrompt,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
@@ -53,7 +53,8 @@ class EdgeAgentExecutor(AIAgent agent) : Executor<string, string>("EdgeAgentExec
         var originalCode = await context.ReadStateAsync<string>("originalCode", scopeName: "SharedCode", cancellationToken);
         Console.WriteLine($"[SHARED STATE] Original code: {originalCode}");
         var response = await agent.RunAsync(fullPrompt, cancellationToken: cancellationToken);
-        return response.Text ?? "";
+        bool hasIssues = (response.Text ?? "").Contains("ISSUES_FOUND");
+        return new EdgeResult(response.Text ?? "", hasIssues);
     }
 }
 
@@ -69,6 +70,21 @@ class HumanReviewExecutor(TaskCompletionSource<bool> approval, TaskCompletionSou
         bool approved = await approval.Task;
         if(!approved) throw new OperationCanceledException("Rejected.");
         return input;
+    }
+
+
+}
+
+class HintAgentExecutor(AIAgent agent) : Executor<EdgeResult, string>("HintAgentExecutor")
+{
+    public override async ValueTask<string> HandleAsync(
+        EdgeResult result,
+        IWorkflowContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await agent.RunAsync(result.Analysis, cancellationToken: cancellationToken);
+        return response.Text ?? "";
+
     }
 
 
